@@ -118,7 +118,7 @@ def log_pattern():
 def log_output(index, command, aimId, flag, result, chats=[], insert_command=True):
     global LOG_FILES, LOG_DATABASE
 
-    time_now = int((datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds())
+    time_now = int((datetime.datetime.now() - datetime.datetime(1970, 1, 1)).total_seconds())
 
     try:
         if LOG_FILES == True:
@@ -190,7 +190,7 @@ def process_user(source):
     global FLAG_USER_BAN
 
     try:
-        time_now = int((datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds())
+        time_now = int((datetime.datetime.now() - datetime.datetime(1970, 1, 1)).total_seconds())
 
         # selecte user
         query = "select id, uin, buy_time, ban from `user` where uin=%s order by id desc" % source
@@ -220,6 +220,43 @@ def process_user(source):
         
     except:
         print('user process error occurs.')
+
+
+# insert order
+def insert_order(source):
+    global BIN_TYPE, DEPOSIT_AMOUNT, GBP_PAY_AMOUNT
+
+    try:
+        time_now = int((datetime.datetime.now() - datetime.datetime(1970, 1, 1)).total_seconds())
+
+        # current id of `chat`
+        query = "select id from `chat` where uin=%s order by id desc" % source
+        query_conn.execute(query)
+        row = query_conn.fetchone()
+        current_chat_id = row[0]
+
+        if BIN_TYPE[source] == 'Fullz':
+            table_name = 'fullz'
+        elif BIN_TYPE[source] == 'dead_fullz':
+            table_name = 'dead_fullz'
+        elif BIN_TYPE[source] == 'PP':
+            table_name = 'pp'
+        else:
+            return
+
+        # insert order
+        query = "select id from %s where lock_customer=%s and status='lock'" % (table_name, source)
+        query_conn.execute(query)
+        f_list = query_conn.fetchall()
+        temp_ids = ''
+        for f in f_list:
+            temp_ids += str(f[0]) + ','
+        query = "insert into `order` (`uin`, `time`, `product_type`, `product_id`, `btc`, `gbp`, `success`, `ongoing`, `chat_id`, `canceled`) values ('%s', '%s', '%s', '%s', '%s', '%s', 'N', 'Y', '%s', 'N')" % (source, time_now, table_name, temp_ids, DEPOSIT_AMOUNT[source], GBP_PAY_AMOUNT[source], current_chat_id)
+        query_conn.execute(query)
+        conn.commit()
+    except Exception as e:
+        print('insert order error occurs.')
+        print(e)
 
 
 def start_cb():
@@ -369,7 +406,7 @@ def buy_cb(bot, event):
     global DEPOSIT_AMOUNT, DEPOSIT_ADDRESS, BIN_TYPE, BUY_FLAG, FULLZ_CONFIRM, DEAD_FULLZ_CONFIRM, PP_CONFIRM, FULLZ_FLAG, DEAD_FULLZ_FLAG, PP_FLAG, PP_NUM, fullz_list, dead_fullz_list, pp_amount, bins_list, FLAG_USER_BAN
 
     source = event.data["source"]["aimId"]
-    time_now = int((datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds())
+    time_now = int((datetime.datetime.now() - datetime.datetime(1970, 1, 1)).total_seconds())
     if (source in FULLZ_CONFIRM and FULLZ_CONFIRM[source]) or (source in DEAD_FULLZ_CONFIRM and DEAD_FULLZ_CONFIRM[source]) or (source in PP_CONFIRM and PP_CONFIRM[source]):
         log_output('160', 'buy', source, 'fail', 'not CONFIRM', [[1, '']])
         message = LOG_PATTERNS[1]['content'] #1
@@ -686,7 +723,7 @@ def unknown_cb(bot, event):
                         a_list = query_conn.fetchall()
                         for i in range(int(num)):
                             p_id = a_list[i][0]
-                            lock_time = int((datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds())
+                            lock_time = int((datetime.datetime.now() - datetime.datetime(1970, 1, 1)).total_seconds())
                             query = "update pp set status='lock', lock_time=%s, lock_customer=%s where id=%s" % (
                                 lock_time, source, p_id)
                             query_conn.execute(query)
@@ -706,6 +743,7 @@ def unknown_cb(bot, event):
                         DEPOSIT_AMOUNT[source] = total_amount
                         GBP_PAY_AMOUNT[source] = gbp_pay_amount
                         PP_CONFIRM[source] = True
+                        insert_order(source)
                     else:
                         log_output('106', command_string, source, 'fail', 'not pp', [[25, '']])
                         message = LOG_PATTERNS[25]['content'] #25
@@ -763,7 +801,7 @@ def unknown_cb(bot, event):
                                 bin_id = f[0]
                                 if bin_name == FULLZ_NAME[source]:
                                     lock_time = int(
-                                        (datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds())
+                                        (datetime.datetime.now() - datetime.datetime(1970, 1, 1)).total_seconds())
                                     query = "update fullz set status='lock', lock_time=%s, lock_customer=%s where id=%s" % (
                                     lock_time, source, bin_id)
                                     query_conn.execute(query)
@@ -790,6 +828,7 @@ def unknown_cb(bot, event):
                         DEPOSIT_ADDRESS[source] = deposit_address
                         DEPOSIT_AMOUNT[source] = total_amount
                         GBP_PAY_AMOUNT[source] = gbp_pay_amount
+                        insert_order(source)
                     else:
                         log_output('122', command_string, source, 'fail', 'not fullz', [[30, '']])
                         message = LOG_PATTERNS[30]['content'] #30
@@ -830,7 +869,7 @@ def unknown_cb(bot, event):
                             bin_id = f[0]
                             if bin_name == FULLZ_NAME[source]:
                                 lock_time = int(
-                                    (datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds())
+                                    (datetime.datetime.now() - datetime.datetime(1970, 1, 1)).total_seconds())
                                 query = "update fullz set status='lock', lock_time=%s, lock_customer=%s where id=%s" % (
                                 lock_time, source, bin_id)
                                 query_conn.execute(query)
@@ -852,6 +891,7 @@ def unknown_cb(bot, event):
                         DEPOSIT_ADDRESS[source] = deposit_address
                         DEPOSIT_AMOUNT[source] = total_amount
                         GBP_PAY_AMOUNT[source] = gbp_pay_amount
+                        insert_order(source)
             elif DEAD_FULLZ_FLAG[source]:
                 bin = ""
                 num = ""
@@ -903,7 +943,7 @@ def unknown_cb(bot, event):
                                 bin_id = f[0]
                                 if bin_name == DEAD_FULLZ_NAME[source]:
                                     lock_time = int(
-                                        (datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds())
+                                        (datetime.datetime.now() - datetime.datetime(1970, 1, 1)).total_seconds())
                                     query = "update dead_fullz set status='lock', lock_time=%s, lock_customer=%s where id=%s" % (
                                     lock_time, source, bin_id)
                                     query_conn.execute(query)
@@ -913,10 +953,7 @@ def unknown_cb(bot, event):
                                     lock_num += 1
                                 if lock_num == int(DEAD_FULLZ_NUM[source]):
                                     break
-                            if DEAD_FULLZ_TYPE[source] == "credit":
-                                pay_amount_temp = CREDIT_PRICE * int(DEAD_FULLZ_NUM[source])
-                            elif DEAD_FULLZ_TYPE[source] == "debit":
-                                pay_amount_temp = DEBIT_PRICE * int(DEAD_FULLZ_NUM[source])
+                            pay_amount_temp = DEAD_FULLZ_PRICE * int(DEAD_FULLZ_NUM[source])
                             pay_amount += float(pay_amount_temp)
                             dead_fullz_list[source].append([DEAD_FULLZ_NAME[source], DEAD_FULLZ_NUM[source]])
                     if pay_amount > 0.0:
@@ -930,6 +967,7 @@ def unknown_cb(bot, event):
                         DEPOSIT_ADDRESS[source] = deposit_address
                         DEPOSIT_AMOUNT[source] = total_amount
                         GBP_PAY_AMOUNT[source] = gbp_pay_amount
+                        insert_order(source)
                     else:
                         log_output('133', command_string, source, 'fail', 'not dead_fullz', [[30, '']])
                         message = LOG_PATTERNS[30]['content'] #30
@@ -970,7 +1008,7 @@ def unknown_cb(bot, event):
                             bin_id = f[0]
                             if bin_name == DEAD_FULLZ_NAME[source]:
                                 lock_time = int(
-                                    (datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds())
+                                    (datetime.datetime.now() - datetime.datetime(1970, 1, 1)).total_seconds())
                                 query = "update dead_fullz set status='lock', lock_time=%s, lock_customer=%s where id=%s" % (
                                 lock_time, source, bin_id)
                                 query_conn.execute(query)
@@ -988,10 +1026,11 @@ def unknown_cb(bot, event):
                         dead_fullz_list[source].append([DEAD_FULLZ_NAME[source], DEAD_FULLZ_NUM[source]])
                         DEAD_FULLZ_FLAG[source] = False
                         DEAD_FULLZ_CONFIRM[source] = True
-                        BIN_TYPE[source] = "Fullz"
+                        BIN_TYPE[source] = "dead_fullz"
                         DEPOSIT_ADDRESS[source] = deposit_address
                         DEPOSIT_AMOUNT[source] = total_amount
                         GBP_PAY_AMOUNT[source] = gbp_pay_amount
+                        insert_order(source)
             else:
                 log_output('111', command_string, source, 'fail', 'not START_FLAG not FLAG', [[22, '']])
                 message = LOG_PATTERNS[22]['content'] #22
@@ -1007,7 +1046,7 @@ def confirm_cb(bot, event):
     source = event.data["source"]["aimId"]
     result_text = ""
     amount = 0
-    time_now = int((datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds())
+    time_now = int((datetime.datetime.now() - datetime.datetime(1970, 1, 1)).total_seconds())
 
     try:
 
@@ -1019,26 +1058,10 @@ def confirm_cb(bot, event):
             message = LOG_PATTERNS[43]['content'] #43
             bot.send_im(target=source, message=message)
             return
-        
-        # current id of `chat`
-        query = "select id from `chat` where uin=%s order by id desc" % source
-        query_conn.execute(query)
-        row = query_conn.fetchone()
-        current_chat_id = row[0]
 
         if source in FULLZ_CONFIRM and FULLZ_CONFIRM[source]:
-            confirm_time = int((datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds())
-            
-            query = "select id from fullz where lock_customer=%s and status='lock'" % source
-            query_conn.execute(query)
-            f_list = query_conn.fetchall()
-            temp_ids = ''
-            for f in f_list:
-                temp_ids += str(f[0]) + ','
-            query = "insert into `order` (`uin`, `time`, `product_type`, `product_id`, `btc`, `gbp`, `success`, `ongoing`, `chat_id`) values ('%s', '%s', 'fullz', '%s', '%s', '%s', 'N', 'Y', '%s')" % (source, time_now, temp_ids, DEPOSIT_AMOUNT[source], GBP_PAY_AMOUNT[source], current_chat_id)
-            query_conn.execute(query)
-            conn.commit()
-            
+            confirm_time = int((datetime.datetime.now() - datetime.datetime(1970, 1, 1)).total_seconds())
+
             query = "update fullz set status='confirm', lock_time=%s, deposit_address='%s' where lock_customer=%s and status='lock'" % (confirm_time, DEPOSIT_ADDRESS[source], source)
             query_conn.execute(query)
             conn.commit()
@@ -1054,17 +1077,7 @@ def confirm_cb(bot, event):
             result_text = LOG_PATTERNS[33]['content'] #33
             bot.send_im(target=source, message=result_text)
         elif source in DEAD_FULLZ_CONFIRM and DEAD_FULLZ_CONFIRM[source]:
-            confirm_time = int((datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds())
-            
-            query = "select id from dead_fullz where lock_customer=%s and status='lock'" % source
-            query_conn.execute(query)
-            f_list = query_conn.fetchall()
-            temp_ids = ''
-            for f in f_list:
-                temp_ids += str(f[0]) + ','
-            query = "insert into `order` (`uin`, `time`, `product_type`, `product_id`, `btc`, `gbp`, `success`, `ongoing`, `chat_id`) values ('%s', '%s', 'dead_fullz', '%s', '%s', '%s', 'N', 'Y', '%s')" % (source, time_now, temp_ids, DEPOSIT_AMOUNT[source], GBP_PAY_AMOUNT[source], current_chat_id)
-            query_conn.execute(query)
-            conn.commit()
+            confirm_time = int((datetime.datetime.now() - datetime.datetime(1970, 1, 1)).total_seconds())
 
             query = "update dead_fullz set status='confirm', lock_time=%s, deposit_address='%s' where lock_customer=%s and status='lock'" % (confirm_time, DEPOSIT_ADDRESS[source], source)
             query_conn.execute(query)
@@ -1081,18 +1094,8 @@ def confirm_cb(bot, event):
             result_text = LOG_PATTERNS[33]['content'] #33
             bot.send_im(target=source, message=result_text)
         elif source in PP_CONFIRM and PP_CONFIRM[source]:
-            confirm_time = int((datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds())
+            confirm_time = int((datetime.datetime.now() - datetime.datetime(1970, 1, 1)).total_seconds())
             
-            query = "select id from pp where lock_customer=%s and status='lock'" % source
-            query_conn.execute(query)
-            f_list = query_conn.fetchall()
-            temp_ids = ''
-            for f in f_list:
-                temp_ids += str(f[0]) + ','
-            query = "insert into `order` (`uin`, `time`, `product_type`, `product_id`, `btc`, `gbp`, `success`, `ongoing`, `chat_id`) values ('%s', '%s', 'pp', '%s', '%s', '%s', 'N', 'Y', '%s')" % (source, time_now, temp_ids, DEPOSIT_AMOUNT[source], GBP_PAY_AMOUNT[source], current_chat_id)
-            query_conn.execute(query)
-            conn.commit()
-
             query = "update pp set status='confirm', lock_time=%s, deposit_address='%s' where lock_customer=%s and status='lock'" % (confirm_time, DEPOSIT_ADDRESS[source], source)
             query_conn.execute(query)
             conn.commit()
@@ -1119,22 +1122,33 @@ def cancel_cb(bot, event):
 
     source = event.data["source"]["aimId"]
     message = ""
+    # print(source)
 
     try:
         if source in FULLZ_CONFIRM and FULLZ_CONFIRM[source]:
-            query = "update fullz set status='on', lock_time=0, lock_customer='', deposit_address='' where status='lock' and lock_customer=%s" %source
+            query = "update fullz set status='on', lock_time=0, lock_customer='', deposit_address='' where status='lock' and lock_customer=%s" % source
             query_conn.execute(query)
             conn.commit()
             update_count = query_conn.rowcount
+
+            query = "update `order` set `canceled`='Y' where uin=%s and product_type='fullz' and ongoing='Y'" % source
+            query_conn.execute(query)
+            conn.commit()
+
             log_output('116', 'cancel', source, 'success', ('%d update fullz status=on' % update_count), [[35, '']])
             message = LOG_PATTERNS[35]['content'] #35
             FULLZ_CONFIRM[source] = False
             DEPOSIT_AMOUNT[source], DEPOSIT_ADDRESS[source], BIN_TYPE[source] = ("", "", "")
         elif source in DEAD_FULLZ_CONFIRM and DEAD_FULLZ_CONFIRM[source]:
-            query = "update dead_fullz set status='on', lock_time=0, lock_customer='', deposit_address='' where status='lock' and lock_customer=%s" %source
+            query = "update dead_fullz set status='on', lock_time=0, lock_customer='', deposit_address='' where status='lock' and lock_customer=%s" % source
             query_conn.execute(query)
             conn.commit()
             update_count = query_conn.rowcount
+
+            query = "update `order` set `canceled`='Y' where uin=%s and product_type='dead_fullz' and ongoing='Y'" % source
+            query_conn.execute(query)
+            conn.commit()
+
             log_output('117', 'cancel', source, 'success', ('%d update dead_fullz status=on' % update_count), [[35, '']])
             message = LOG_PATTERNS[35]['content'] #35
             DEAD_FULLZ_CONFIRM[source] = False
@@ -1144,6 +1158,11 @@ def cancel_cb(bot, event):
             query_conn.execute(query)
             conn.commit()
             update_count = query_conn.rowcount
+
+            query = "update `order` set `canceled`='Y' where uin=%s and product_type='pp' and ongoing='Y'" % source
+            query_conn.execute(query)
+            conn.commit()
+
             log_output('118', 'cancel', source, 'success', ('%d update pp status=on' % update_count), [[35, '']])
             message = LOG_PATTERNS[35]['content'] #35
             PP_CONFIRM[source] = False

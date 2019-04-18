@@ -117,13 +117,13 @@ class BinModel:
         return r_list
 
     def getOrder(self, where='1'):
-        query = "select id, uin, `time`, product_type, product_id, btc, success, ongoing, chat_id, gbp from `order` where %s order by `time` desc" % where
+        query = "select id, uin, `time`, product_type, product_id, btc, success, ongoing, chat_id, gbp, canceled from `order` where %s order by `time` desc" % where
         self.query_conn.execute(query)
         f_list = self.query_conn.fetchall()
         r_list = []
         for f in f_list:
             time = (datetime.datetime(1970, 1, 1) + datetime.timedelta(seconds=f[2])).strftime('%Y-%m-%d %H:%M:%S')
-            r_list.append({'id': f[0], 'uin': f[1], 'time': time, 'product_type': f[3], 'product_id': f[4], 'btc': f[5], 'success': f[6], 'ongoing': f[7], 'chat_id': f[8], 'gbp': f[9]})
+            r_list.append({'id': f[0], 'uin': f[1], 'time': time, 'product_type': f[3], 'product_id': f[4], 'btc': f[5], 'success': f[6], 'ongoing': f[7], 'chat_id': f[8], 'gbp': f[9], 'canceled': f[10]})
         return r_list
 
     def setUserBan(self, uin, ban):

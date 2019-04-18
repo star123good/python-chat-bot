@@ -10,6 +10,7 @@ import time
 import datetime
 from blockchain import blockexplorer
 from icq.bot import ICQBot
+import pdb, traceback, sys
 
 conn = mysql.connector.connect(host='localhost', database='bin', user='binbot', password='football!!!')
 query_conn = conn.cursor(buffered=True)
@@ -68,7 +69,7 @@ def log_pattern():
 def log_output(index, command, aimId, flag, result, chats=[], insert_command=True):
     global LOG_FILES, LOG_DATABASE
 
-    time_now = int((datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds())
+    time_now = int((datetime.datetime.now() - datetime.datetime(1970, 1, 1)).total_seconds())
 
     try:
         if LOG_FILES == True:
@@ -157,7 +158,7 @@ def get_payment_pp(customer_id, deposit_address):
 
 def main():
     try:
-        time_now = int((datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds())
+        time_now = int((datetime.datetime.now() - datetime.datetime(1970, 1, 1)).total_seconds())
 
         # confirm -> on
         unlock_time = time_now - 7200
@@ -225,7 +226,6 @@ def main():
         update_count = query_conn.rowcount
         if(update_count > 0):
             log_output('209', 'thread', uin, 'success', ('%d update dead_fullz status=on from status=dead' % update_count), [], False)
-        
 
         # each deposit
         query_conn.execute("select * from deposit where 1")
@@ -233,7 +233,7 @@ def main():
 
         for deposit in d_list:
             id, bin_type, deposit_address, deposit_amount, paid_amount, paid_time, uin, start_time = deposit
-            time_now = int((datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds())
+            time_now = int((datetime.datetime.now() - datetime.datetime(1970, 1, 1)).total_seconds())
             transaction_info = blockexplorer.get_address(address=deposit_address)
             tran = transaction_info.transactions
             result_text = ""
@@ -287,7 +287,7 @@ def main():
                                 log_output('211', 'thread', uin, 'success', ('%d delete pp' % delete_count), [], False)
 
                         # `order` success = 'Y'
-                        query = "update `order` set `success`='Y' where uin=%s and time=%s and btc=%s" % (uin, start_time, deposit_amount)
+                        query = "update `order` set `success`='Y' where uin=%s and product_type='%s' and btc=%s and ongoing='Y'" % (uin, bin_type, deposit_amount)
                         query_conn.execute(query)
                         conn.commit()
                         update_count = query_conn.rowcount
@@ -314,7 +314,7 @@ def main():
                                     for f in f_list:
                                         full_name, birth_date, address, zip, country, phone, ssn, secu_question, secu_answer, card_bin, card_bank, card_type, card_number, expire_date, cvv, account_number, sortcode, user_name, password, ip, location, user_agent, browser, platform, type = f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7], f[8], f[9], f[10], f[11], f[12], f[13], f[14], f[15], f[16], f[17], f[18], f[19], f[20], f[21], f[22], f[23], f[24]
                                         insert_query = "insert into `dead_fullz` (`full_name`, `birth_date`, `address`, `zip`, `country`, `phone`, `ssn`, `secu_question`, `secu_answer`, `card_bin`, `card_bank`, `card_type`, `card_number`, `expire_date`, `cvv`, `account_number`, `sortcode`, `user_name`, `password`, `ip_address`, `location`, `user_agent`, `browser`, `platform`, `type`, `status`, `lock_time`) values ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', 'dead', '%s')" % (full_name, birth_date, address, zip, country, phone, ssn, secu_question, secu_answer, card_bin, card_bank, card_type, card_number, expire_date, cvv, account_number, sortcode, user_name, password, ip, location, user_agent, browser, platform, type, time_now)
-                                        query_conn.execute(query)
+                                        query_conn.execute(insert_query)
                                         conn.commit()
                                         insert_count = query_conn.rowcount
                                         log_output('213', 'thread', uin, 'success', ('%d insert dead_fullz status=dead' % insert_count), [], False)
@@ -345,7 +345,7 @@ def main():
                                         log_output('217', 'thread', uin, 'success', ('%d delete pp' % delete_count), [], False)
 
                                 # `order` success = 'Y'
-                                query = "update `order` set `success`='Y' where uin=%s and time=%s and btc=%s" % (uin, start_time, deposit_amount)
+                                query = "update `order` set `success`='Y' where uin=%s and product_type='%s' and btc=%s and ongoing='Y'" % (uin, bin_type, deposit_amount)
                                 query_conn.execute(query)
                                 conn.commit()
                                 update_count = query_conn.rowcount
@@ -389,8 +389,10 @@ def main():
             if result_text != "":
                 log_output('223', 'thread', uin, 'success', 'not payment', [[0, result_text]], False)
                 bot.send_im(target=uin, message=result_text)
-    except:
+    except Exception as e:
         print('thread main error occurs.')
+        print(e)
+        traceback.print_exc()
 
 if __name__ == '__main__':
     # get log patterns
